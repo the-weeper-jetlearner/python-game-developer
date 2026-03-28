@@ -1,0 +1,29 @@
+#Quiz = ("what is the sun made out of","3")
+#question,answer=Quiz
+#print (question)
+#for i in range(len(Quiz)):
+#    print(Quiz[i], end=" ")
+import random 
+points = 0
+question1 = ("why is the earth round:" ,"cause it is","wrong")
+question2 = ("how deep is the mariana trench: ","11,034m deep","wrong")
+question3 = ("how do you build a ikea chair: ","just do it","wrong")
+
+Questions = [question1,question2,question3]
+random.shuffle(Questions)
+for i in range(len(Questions)):
+    tree = input(Questions[i][0])
+    if tree == Questions[i][1]:
+        print("you got it right, this time...")
+        points += 1
+    else:
+        print(Questions[i][2])
+print (f"{points}/3")
+if points == 3:
+    print("you have been promted to Elemetry school, horay")
+elif points == 2:
+    print("could be better")
+elif points == 1:
+    print("go study")
+else:
+    print("pls, redo this grade of english")
