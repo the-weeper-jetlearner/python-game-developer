@@ -1,0 +1,48 @@
+import pgzrun
+import random
+WIDTH = 512
+HEIGHT = 554
+player = Actor("ship")
+player.pos = (256, 275)
+enemiesImg = ["greenenemy", "greyenemy", "redenemy", "blueenemy"]
+enemies = []
+def update():
+    pass
+
+def on_mouse_down(pos):
+    animate(
+    player,
+    angle = player.angle_to(pos) - 90,
+    duration = 0.7
+    )
+    
+    animate(
+    player,
+    pos=pos,
+    duration = 0.7,
+    tween = "bounce_end",
+    )
+    
+def spawn_enemie():
+    img = random.choice(enemiesImg)
+    enemy = Actor(img)
+    enemies.append(enemy)
+    if img == "greenenemy":
+        enemy.pos = (0.0)#top left
+        
+    elif img == "greyenemy":
+        enemy.pos = (512,554)
+    elif img == "blueenemy":
+        enemy.pos = (512,0)
+    elif img == "redenemy":
+        enemy.pos = (0,554)
+
+clock.schedule_interval(spawn_enemie, 5)
+
+def draw():
+    screen.blit("map", (0, 0))
+    player.draw()
+    for enemie in enemies:
+        enemie.draw()
+        
+pgzrun.go()
