@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Ancient Dash Map</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+
+            /* parchment map look */
+            background: radial-gradient(circle at center, #d8c9a3, #b59a6a);
+            font-family: "Trebuchet MS", serif;
+        }
+
+        /* main layout */
+        .container {
+            display: flex;
+            gap: 40px;
+            align-items: center;
+        }
+
+        /* game canvas border like a framed map */
+        #game {
+            border: 6px solid #5a4326;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.4),
+                0 0 25px rgba(0, 0, 0, 0.5);
+        }
+
+        /* side “map notes” */
+        .map-ui {
+            width: 260px;
+            padding: 20px;
+            background: rgba(255, 244, 210, 0.85);
+            border: 3px solid #6b4f2a;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            color: #3b2a14;
+        }
+
+        /* title */
+        .title {
+            font-size: 24px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        /* fake handwritten vibe */
+        .notes {
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 20px;
+        }
+
+        /* goofy flavor text */
+        .flavor {
+            font-size: 13px;
+            font-style: italic;
+            opacity: 0.8;
+        }
+
+        /* health styled like ink bar */
+        .health-container {
+            margin-top: 15px;
+        }
+
+        .health-bar {
+            height: 16px;
+            background: #3b2a14;
+            border: 2px solid #2a1d0e;
+        }
+
+        .health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #2ecc71, #27ae60);
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <div id="game"></div>
+
+        <div class="map-ui">
+            <div class="title">🗺️ Captain's Orders</div>
+
+            <div class="notes">
+                • Click to launch thy ship<br>
+                • Ram foes whilst dashing<br>
+                • Protect the sacred map<br><br>
+
+                ⚠ If the map falls…<br>
+                all is lost to the abyss
+            </div>
+
+            <div class="flavor">
+                “Note: Crew still unsure why the ship bounces.”
+            </div>
+
+            <div class="health-container">
+                <div class="health-bar">
+                    <div id="healthFill" class="health-fill"></div>
+                </div>
+                <div id="healthText">Integrity: 100%</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const WIDTH = 512;
+        const HEIGHT = 554;
+
+        let player;
+        let enemies = [];
+        let explosions = [];
+        let doomExplosions = [];
+
+        let dashing = false;
+        let map_health = 100;
+        let game_over = false;
+        let doom_active = false;
+        let doom_timer = 0;
+
+        const enemyImages = ["greenenemy", "greyenemy", "redenemy", "blueenemy"];
+
+        const config = {
+            type: Phaser.AUTO,
+            width: WIDTH,
+            height: HEIGHT,
+            parent: "game",
+            scene: { preload, create, update }
+        };
+
+        new Phaser.Game(config);
+
+        function preload() {
+            this.load.image("map", "map.png");
+            this.load.image("ship", "ship.png");
+
+            enemyImages.forEach(img => {
+                this.load.image(img, img + ".png");
+            });
+
+            for (let i = 1; i <= 6; i++) {
+                this.load.image("explosion" + i, "explosion" + i + ".png");
+            }
+        }
+
+        function create() {
+            this.add.image(0, 0, "map").setOrigin(0);
+            player = this.add.sprite(256, 275, "ship");
+
+            this.input.on("pointerdown", (pointer) => {
+                dashing = true;
+
+                let angle = Phaser.Math.Angle.Between(player.x, player.y, pointer.x, pointer.y);
+                player.setRotation(angle + Math.PI / 2);
+
+                this.tweens.add({
+                    targets: player,
+                    x: pointer.x,
+                    y: pointer.y,
+                    duration: 700,
+                    ease: "Bounce.Out",
+                    onComplete: () => dashing = false
+                });
+            });
+
+            this.time.addEvent({
+                delay: 1000,
+                callback: spawnEnemy,
+                callbackScope: this,
+                loop: true
+            });
+        }
+
+        function spawnEnemy() {
+            let img = Phaser.Utils.Array.GetRandom(enemyImages);
+            let enemy = this.add.sprite(0, 0, img);
+
+            enemy.speed = Phaser.Math.Between(1, 3);
+            enemy.timer = 0;
+
+            if (img === "greenenemy") enemy.setPosition(0, 0);
+            if (img === "greyenemy") enemy.setPosition(512, 554);
+            if (img === "blueenemy") enemy.setPosition(512, 0);
+            if (img === "redenemy") enemy.setPosition(0, 554);
+
+            enemies.push(enemy);
+        }
+
+        function createExplosion(scene, x, y, list) {
+            let e = scene.add.sprite(x, y, "explosion1");
+            e.frameIndex = 1;
+            e.timer = 0;
+            list.push(e);
+        }
+
+        function updateExplosions(scene) {
+            explosions = explosions.filter(e => {
+                e.timer++;
+                if (e.timer % 5 === 0) {
+                    e.frameIndex++;
+                    if (e.frameIndex > 6) {
+                        e.destroy();
+                        return false;
+                    }
+                    e.setTexture("explosion" + e.frameIndex);
+                }
+                return true;
+            });
+
+            doomExplosions = doomExplosions.filter(e => {
+                e.timer++;
+                if (e.timer % 3 === 0) {
+                    e.frameIndex++;
+                    if (e.frameIndex > 6) {
+                        e.destroy();
+                        return false;
+                    }
+                    e.setTexture("explosion" + e.frameIndex);
+                }
+                return true;
+            });
+        }
+
+        function triggerDoom(scene) {
+            game_over = true;
+            doom_active = true;
+            doom_timer = 0;
+
+            enemies.forEach(e => e.destroy());
+            enemies = [];
+        }
+
+        function updateUI() {
+            document.getElementById("healthFill").style.width = map_health + "%";
+            document.getElementById("healthText").innerText = "Integrity: " + map_health + "%";
+        }
+
+        function update() {
+            if (game_over) {
+                updateExplosions(this);
+
+                if (doom_active) {
+                    doom_timer++;
+                    if (doom_timer % 5 === 0) {
+                        createExplosion(this,
+                            Phaser.Math.Between(0, WIDTH),
+                            Phaser.Math.Between(0, HEIGHT),
+                            doomExplosions);
+                    }
+                }
+                return;
+            }
+
+            enemies = enemies.filter(enemy => {
+                let dx = player.x - enemy.x;
+                let dy = player.y - enemy.y;
+                let dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist !== 0) {
+                    enemy.x += (dx / dist) * enemy.speed;
+                    enemy.y += (dy / dist) * enemy.speed;
+                }
+
+                if (dashing && Phaser.Geom.Intersects.RectangleToRectangle(
+                    player.getBounds(),
+                    enemy.getBounds()
+                )) {
+                    createExplosion(this, enemy.x, enemy.y, explosions);
+                    enemy.destroy();
+                    return false;
+                }
+
+                enemy.timer++;
+                if (enemy.timer > 120) {
+                    map_health -= 5;
+                    enemy.timer = 0;
+                }
+
+                if (map_health <= 0) triggerDoom(this);
+
+                return true;
+            });
+
+            updateExplosions(this);
+            updateUI();
+        }
+    </script>
+
+</body>
+
+</html>
